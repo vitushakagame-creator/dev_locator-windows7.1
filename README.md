@@ -1,2 +1,3 @@
-# dev_locator-windows7.1
-dist_locators_NEW
+# DevSpace
+
+См. `README_DevSpace_Python.md` для запуска и публикации Python/Flask-версии.
