@@ -1,0 +1,15 @@
+{
+  "name": "devspace-community",
+  "version": "1.0.0",
+  "private": true,
+  "description": "DevSpace project community with shared accounts, uploads and GitHub OAuth login",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" },
+  "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "express": "^4.21.2",
+    "express-session": "^1.18.1",
+    "multer": "^1.4.5-lts.1"
+  }
+}
