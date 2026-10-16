@@ -231,7 +231,7 @@ def github_login():
     if not GITHUB_CLIENT_ID or not GITHUB_CALLBACK_URL:
         return 'GitHub login is not configured. Set GITHUB_CLIENT_ID, GITHUB_CLIENT_SECRET and GITHUB_CALLBACK_URL.', 503
     state = secrets.token_urlsafe(32); session['githubOAuthState'] = state
-    params = {'client_id':GITHUB_CLIENT_ID, 'redirect_uri':GITHUB_CALLBACK_URL, 'scope':'read:user user:email', 'state':state}
+    params = {'client_id':GITHUB_CLIENT_ID, 'redirect_uri':GITHUB_CALLBACK_URL, 'scope':'read:user user:email repo', 'state':state}
     return redirect('https://github.com/login/oauth/authorize?' + urlencode(params))
 
 @app.get('/auth/github/callback')
@@ -261,10 +261,42 @@ def github_callback():
                 db.add(u)
             else: u.github_login = str(profile['login'])
             db.commit(); username = u.name
-        session.clear(); session['user'] = username; session.permanent = True
+        session.clear(); session['user'] = username; session['github_access_token'] = token; session['github_login'] = str(profile['login']); session.permanent = True
         return redirect((SITE_URL or '/') + ('&' if '?' in (SITE_URL or '') else '?') + 'github_login=success')
     except Exception:
         app.logger.exception('GitHub OAuth error'); return fail('Не удалось войти через GitHub. Попробуй ещё раз.')
+
+@app.get('/api/github/repos')
+def github_repositories():
+    token = session.get('github_access_token')
+    if not current_user() or not token:
+        return jsonify(error='Войди через GitHub, чтобы просмотреть свои репозитории.'), 401
+    repos = []
+    try:
+        for page in range(1, 11):
+            response = requests.get(
+                'https://api.github.com/user/repos',
+                headers={'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'User-Agent': 'DevSpace'},
+                params={'sort': 'updated', 'per_page': 100, 'page': page, 'affiliation': 'owner,collaborator,organization_member'},
+                timeout=20,
+            )
+            if not response.ok:
+                return jsonify(error='GitHub не отдал список репозиториев. Проверь разрешения приложения и войди через GitHub ещё раз.'), response.status_code
+            batch = response.json()
+            if not isinstance(batch, list):
+                break
+            repos.extend(batch)
+            if len(batch) < 100:
+                break
+        return jsonify(repositories=[{
+            'id': r.get('id'), 'name': r.get('name', ''), 'full_name': r.get('full_name', ''),
+            'description': r.get('description') or '', 'html_url': r.get('html_url', ''),
+            'private': bool(r.get('private')), 'language': r.get('language') or 'Не указан',
+            'updated_at': r.get('updated_at', ''), 'default_branch': r.get('default_branch', 'main'),
+            'stars': r.get('stargazers_count', 0), 'fork': bool(r.get('fork'))
+        } for r in repos])
+    except requests.RequestException:
+        return jsonify(error='Не удалось связаться с GitHub. Попробуй ещё раз.'), 502
 
 @app.get('/api/state')
 def state():
@@ -297,7 +329,7 @@ def login():
         except (ValueError, TypeError): valid = False
         if not valid: return jsonify(error='Неверное имя пользователя или пароль.'), 401
         username = u.name
-    session.clear(); session['user'] = username; session.permanent = True
+    session.clear(); session['user'] = username; session['github_access_token'] = token; session['github_login'] = str(profile['login']); session.permanent = True
     return jsonify(user={'name':username})
 
 @app.post('/api/logout')
@@ -430,7 +462,7 @@ def import_account():
         u = get_user(db, name); token_hash = hashlib.sha256(token.encode()).hexdigest()
         if not u or not u.account_token_hash or not secrets.compare_digest(token_hash, u.account_token_hash): return jsonify(error='Файл аккаунта недействителен. Войди по паролю и скачай новый файл.'), 401
         username = u.name
-    session.clear(); session['user'] = username; session.permanent = True
+    session.clear(); session['user'] = username; session['github_access_token'] = token; session['github_login'] = str(profile['login']); session.permanent = True
     return jsonify(user={'name':username})
 
 @app.errorhandler(413)

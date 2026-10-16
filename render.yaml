@@ -1,18 +1,18 @@
 services:
   - type: web
     name: devspace-community
-    runtime: python
+    runtime: node
     plan: starter
-    buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn --workers 2 --bind 0.0.0.0:$PORT server:app
+    buildCommand: npm install
+    startCommand: npm start
     healthCheckPath: /healthz
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.0
-      - key: REQUIRE_PERSISTENT_STORAGE
-        value: "1"
-      - key: COOKIE_SECURE
-        value: "1"
+      - key: NODE_ENV
+        value: production
+      - key: DATA_DIR
+        value: /var/data
+      - key: UPLOAD_DIR
+        value: /var/data/uploads
       - key: SESSION_SECRET
         generateValue: true
     disk:

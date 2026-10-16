@@ -1,3 +1,2 @@
-# DevSpace
-
-Начни с файла `README_SUPABASE_RU.md`: в нём инструкция по настройке Supabase, запуску и публикации сайта.
+# dev_locator-windows7.1
+dist_locators_NEW
